@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Location Map</title>
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Comic+Neue:wght@700&display=swap" rel="stylesheet">
+
+    <style>
+    * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+        font-family: 'Comic Neue', cursive;
+    }
+
+    body {
+        background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+        min-height: 100vh;
+        padding: 2rem 1rem;
+    }
+
+    h1 {
+        margin-bottom: 1.5rem;
+        font-size: 2.5rem;
+        color: #ff6b6b;
+        text-shadow: 2px 2px 0 #fff;
+        text-align: center;
+        letter-spacing: 2px;
+    }
+
+    #container {
+        background: #fff;
+        padding: 2rem;
+        border-radius: 20px;
+        box-shadow: 8px 8px 0 #4ecdc4;
+        border: 4px solid #4ecdc4;
+        max-width: 800px;
+        margin: 0 auto;
+        position: relative;
+        transform: rotate(-1deg);
+    }
+
+    #controls {
+        display: flex;
+        gap: 1rem;
+        margin-bottom: 2rem;
+    }
+
+    input {
+        flex: 1;
+        padding: 1rem;
+        border: 3px solid #ff6b6b;
+        border-radius: 15px;
+        font-size: 1.2rem;
+        background: #fff9ec;
+        font-family: 'Comic Neue', cursive;
+    }
+
+    input:focus {
+        outline: none;
+        box-shadow: 0 0 0 3px #ffe66d;
+    }
+
+    button {
+        padding: 1rem 2rem;
+        background: #4ecdc4;
+        color: white;
+        border: none;
+        border-radius: 15px;
+        font-size: 1.2rem;
+        cursor: pointer;
+        box-shadow: 4px 4px 0 #45b7af;
+        transition: all 0.2s ease;
+        transform: rotate(1deg);
+        font-weight: bold;
+    }
+
+    button:hover {
+        transform: rotate(-1deg) translateY(-2px);
+        box-shadow: 6px 6px 0 #45b7af;
+    }
+
+    #locationsList {
+        list-style: none;
+        padding: 1rem;
+        margin: 2rem 0;
+        border: 3px dashed #ff6b6b;
+        border-radius: 15px;
+        background: #fff;
+    }
+
+    #locationsList li {
+        padding: 1rem;
+        margin: 0.5rem 0;
+        background: #ffe66d;
+        border-radius: 10px;
+        box-shadow: 3px 3px 0 #ffd700;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        position: relative;
+    }
+
+    #locationsList li:hover {
+        transform: translateX(10px);
+        background: #ffd700;
+    }
+
+    #locationsList li::before {
+        content: '🌍';
+        margin-right: 1rem;
+        filter: drop-shadow(2px 2px 0 rgba(0,0,0,0.1));
+    }
+
+    #map {
+        height: 500px;
+        width: 100%;
+        border-radius: 15px;
+        border: 4px solid #ff6b6b;
+        overflow: hidden;
+        box-shadow: 6px 6px 0 #ff6b6b;
+        background: white;
+    }
+
+    @media (max-width: 640px) {
+        #container {
+            padding: 1.5rem;
+            transform: rotate(0);
+        }
+        
+        button {
+            width: 100%;
+        }
+    }
+
+    /* Cartoon cloud animation */
+    @keyframes float {
+        0% { transform: translateY(0px); }
+        50% { transform: translateY(-20px); }
+        100% { transform: translateY(0px); }
+    }
+
+    .cartoon-cloud {
+        position: absolute;
+        animation: float 3s ease-in-out infinite;
+        pointer-events: none;
+    }
+</style>
+
+</head>
+<body>
+
+    <h1>Interactive Location Map</h1>
+    <div id="container">
+        <div id="controls">
+            <input type="text" id="locationInput" placeholder="Enter location">
+            <button id="addLocationButton">Add</button>
+        </div>
+        
+        <ul id="locationsList"></ul>
+        <div class="cartoon-cloud" style="top: 10%; left: 5%; font-size: 3rem;">☁️</div>
+        <div class="cartoon-cloud" style="top: 30%; right: 5%; font-size: 2rem;">⛅</div>
+        <div id="map"></div>
+    </div>
+
+    <script>
+        const locationInput = document.getElementById("locationInput"); 
+        const addLocationButton = document.getElementById("addLocationButton");
+        const locationsList = document.getElementById("locationsList");
+
+        let locationsArray = [];
+        let map, markerLayer;
+
+        function initMap() {
+            map = L.map("map").setView([12.8797, 121.7740], 5); // Centered on the Philippines
+            L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+                attribution: "© OpenStreetMap contributors",
+            }).addTo(map);
+            markerLayer = L.layerGroup().addTo(map);
+        }
+
+        addLocationButton.addEventListener("click", () => {
+            const location = locationInput.value.trim();
+            if (location !== "") {
+                locationsArray.push(location);
+                locationInput.value = "";
+                updateLocationsList();
+                updateMap(location);
+            }
+        });
+
+        function updateLocationsList() {
+            locationsList.innerHTML = "";
+            locationsArray.forEach((location) => {
+                const li = document.createElement("li");
+                li.textContent = location;
+                li.addEventListener("click", () => updateMap(location));
+                locationsList.appendChild(li);
+            });
+        }
+
+        function updateMap(location) {
+            const coordinates = getCoordinatesForLocation(location);
+            if (coordinates) {
+                map.setView(coordinates, 6);
+                markerLayer.clearLayers();
+                L.marker(coordinates).addTo(markerLayer).bindPopup(location).openPopup();
+            } else {
+                alert("Location not found or coordinates not available.");
+            }
+        }
+
+        function getCoordinatesForLocation(location) {
+            const locationCoordinates = {
+                "philippines": [12.8797, 121.7740],
+                "taiwan": [23.6978, 120.9605],
+                "manila": [14.5995, 120.9842],
+                "iloilo": [10.7202, 122.5621]
+            };
+            return locationCoordinates[location.toLowerCase()];
+        }
+
+        initMap();
+    </script>
+
+</body>
+</html>
